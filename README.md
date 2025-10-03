@@ -1,5 +1,10 @@
 # X-Touch Compact → ETC Eos OSC Bridge
 
+[![GitHub release](https://img.shields.io/github/v/release/LogicFlame-Dev/xtouch-eos-bridge)](https://github.com/LogicFlame-Dev/xtouch-eos-bridge/releases)
+![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
+[![License](https://img.shields.io/github/license/LogicFlame-Dev/xtouch-eos-bridge)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/LogicFlame-Dev/xtouch-eos-bridge?style=social)](https://github.com/LogicFlame-Dev/xtouch-eos-bridge/stargazers)
+
 This project links a **Behringer X-Touch Compact** to ETC Eos consoles over **OSC**, giving you motorised fader control, encoder mapping for pan/tilt, bump buttons, and playback integration.  
 Developed by [**LogicFlameDevelopment**](https://logicflame.dev).
 
