@@ -8,12 +8,22 @@ printBanner();
   
 logEvent("Startup", `Listening on ${midi.inputName}`);
 
+const selection = require('./eos/selection');
+selection.start();
+
+
 const { input, output } = require('./midi');
 //emitter.setMaxListeners(20)
 
 // Map incoming fader moves (CC 0-7) to Eos fader levels
 const {handleCC} = require('./handlers/midiCC');
-input.on('cc', handleCC);
+const {handleTopRowCC} = require('./handlers/encodersTopRow');
+input.on('cc', (msg) => {
+    // First, let your existing CC handler run (faders, dedicated pan/tilt encoders)
+    handleCC(msg);
+    // Then, route top-row encoders (will ignore CCs that aren’t in TOP_ROW_CC)
+    handleTopRowCC(msg);
+  });
 
 const { handleNoteOn, handleNoteOff } = require('./handlers/midiNote');
 input.on('noteon', handleNoteOn);

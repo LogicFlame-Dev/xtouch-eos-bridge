@@ -16,19 +16,27 @@ const udpPort = new osc.UDPPort({
 try { udpPort.setMaxListeners(50); } catch {}
 
 let isPortOpen = false;
-const lastParam = { pan: null, tilt: null };
+
+// cache for selected param values (0..1 normalized)
+const lastParam = {
+  pan:  null,
+  tilt: null,
+  zoom: null,
+  hue:  null,
+  sat:  null,
+  cct:  null,
+};
 
 // --- Simple subscription API for fader updates coming from Eos ---
 let faderLevelCb = null;
-function onFaderLevel(cb) { faderLevelCb = typeof cb === 'function' ? cb : null; }
-
+function onFaderLevel(cb) { faderLevelCb = (typeof cb === 'function') ? cb : null; }
 
 // Cache + log incoming
 udpPort.on('message', (oscMessage) => {
   if (debuger) console.log('Received OSC message:', oscMessage);
   if (!oscMessage || !oscMessage.address) return;
 
-  // existing PAN/TILT cache...
+  // existing PAN/TILT cache (accept several out forms)
   if (oscMessage.address.indexOf('/eos/out/param/pan') === 0 ||
       oscMessage.address === `/eos/out/user/${USER_MAP}/selected/param/pan`) {
     const v = Number(oscMessage.args?.[0]);
@@ -40,7 +48,29 @@ udpPort.on('message', (oscMessage) => {
     if (Number.isFinite(v)) lastParam.tilt = Math.max(0, Math.min(1, v / 100));
   }
 
-  // NEW: fader follow from Eos -> surface
+  // NEW: cache zoom / hue / sat / cct in same style (0..1)
+  if (oscMessage.address.indexOf('/eos/out/param/zoom') === 0 ||
+      oscMessage.address === `/eos/out/user/${USER_MAP}/selected/param/zoom`) {
+    const v = Number(oscMessage.args?.[0]);
+    if (Number.isFinite(v)) lastParam.zoom = Math.max(0, Math.min(1, v / 100));
+  }
+  if (oscMessage.address.indexOf('/eos/out/param/color/hue') === 0 ||
+      oscMessage.address === `/eos/out/user/${USER_MAP}/selected/param/color/hue`) {
+    const v = Number(oscMessage.args?.[0]);
+    if (Number.isFinite(v)) lastParam.hue = Math.max(0, Math.min(1, v / 100));
+  }
+  if (oscMessage.address.indexOf('/eos/out/param/color/sat') === 0 ||
+      oscMessage.address === `/eos/out/user/${USER_MAP}/selected/param/color/sat`) {
+    const v = Number(oscMessage.args?.[0]);
+    if (Number.isFinite(v)) lastParam.sat = Math.max(0, Math.min(1, v / 100));
+  }
+  if (oscMessage.address.indexOf('/eos/out/param/ctc') === 0 ||
+      oscMessage.address === `/eos/out/user/${USER_MAP}/selected/param/ctc`) {
+    const v = Number(oscMessage.args?.[0]);
+    if (Number.isFinite(v)) lastParam.cct = Math.max(0, Math.min(1, v / 100));
+  }
+
+  // fader follow from Eos -> surface
   const m = oscMessage.address.match(/^\/eos\/(?:out\/)?fader\/1\/(\d+)$/);
   if (m && faderLevelCb) {
     const fader = parseInt(m[1], 10);                // 1..10
@@ -51,7 +81,6 @@ udpPort.on('message', (oscMessage) => {
     }
   }
 });
-
 
 udpPort.on('error', (err) => console.error('OSC Error:', err));
 udpPort.on('close', () => {
@@ -114,6 +143,7 @@ process.once('SIGTERM', gracefulShutdown);
 
 // ====== EXPORTS ======
 module.exports = {
+  _transport: { udpPort, CONSOLE_HOST, CONSOLE_PORT, USER_MAP },
   eosFaderBankConfig: async function() {
     return new Promise((resolve, reject) => {
       udpPort.send({ address: '/eos/fader/1/config/10', args: [] }, CONSOLE_HOST, CONSOLE_PORT, (err) => {
@@ -297,5 +327,171 @@ module.exports = {
 
     udpPort.on('message', onMsg);
   },
+
+  // ---- EXTRA PARAMS (same flow as pan/tilt) ----
+  setZoomValue: function (value) {
+    const percent = toPercent(value);
+    udpPort.send({
+      address: `/eos/param/zoom`,
+      args: [{ type: 'f', value: percent }]
+    }, CONSOLE_HOST, CONSOLE_PORT);
+  },
+
+  getZoomValue: function (callback) {
+    if (typeof callback !== 'function') callback = () => {};
+    udpPort.send({ address: `/eos/get/param/zoom`, args: [] }, CONSOLE_HOST, CONSOLE_PORT);
+
+    const expected = new Set([
+      `/eos/out/param/zoom`,
+      `/eos/out/param/zoom/percent`,
+      `/eos/out/user/${USER_MAP}/selected/param/zoom`
+    ]);
+
+    const onMsg = (msg) => {
+      if (!msg || !expected.has(msg.address)) return;
+      const raw = Number(msg.args?.[0]);
+      if (!Number.isFinite(raw)) return;
+      cleanup();
+      const zeroToOne = toZeroOne(raw);
+      lastParam.zoom = zeroToOne;
+      callback(zeroToOne);
+    };
+
+    const cleanup = () => {
+      try { udpPort.removeListener('message', onMsg); } catch {}
+      clearTimeout(timer);
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      if (lastParam.zoom !== null) callback(lastParam.zoom);
+    }, 300);
+
+    udpPort.on('message', onMsg);
+  },
+
+  setHueValue: function (value) {
+    const percent = toPercent(value);
+    udpPort.send({
+      address: `/eos/param/color/hue`,
+      args: [{ type: 'f', value: percent }]
+    }, CONSOLE_HOST, CONSOLE_PORT);
+  },
+
+  getHueValue: function (callback) {
+    if (typeof callback !== 'function') callback = () => {};
+    udpPort.send({ address: `/eos/get/param/color/hue`, args: [] }, CONSOLE_HOST, CONSOLE_PORT);
+
+    const expected = new Set([
+      `/eos/out/param/color/hue`,
+      `/eos/out/param/color/hue/percent`,
+      `/eos/out/user/${USER_MAP}/selected/param/color/hue`
+    ]);
+
+    const onMsg = (msg) => {
+      if (!msg || !expected.has(msg.address)) return;
+      const raw = Number(msg.args?.[0]);
+      if (!Number.isFinite(raw)) return;
+      cleanup();
+      const zeroToOne = toZeroOne(raw);
+      lastParam.hue = zeroToOne;
+      callback(zeroToOne);
+    };
+
+    const cleanup = () => {
+      try { udpPort.removeListener('message', onMsg); } catch {}
+      clearTimeout(timer);
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      if (lastParam.hue !== null) callback(lastParam.hue);
+    }, 300);
+
+    udpPort.on('message', onMsg);
+  },
+
+  setSatValue: function (value) {
+    const percent = toPercent(value);
+    udpPort.send({
+      address: `/eos/param/color/sat`,
+      args: [{ type: 'f', value: percent }]
+    }, CONSOLE_HOST, CONSOLE_PORT);
+  },
+
+  getSatValue: function (callback) {
+    if (typeof callback !== 'function') callback = () => {};
+    udpPort.send({ address: `/eos/get/param/color/sat`, args: [] }, CONSOLE_HOST, CONSOLE_PORT);
+
+    const expected = new Set([
+      `/eos/out/param/color/sat`,
+      `/eos/out/param/color/sat/percent`,
+      `/eos/out/user/${USER_MAP}/selected/param/color/sat`
+    ]);
+
+    const onMsg = (msg) => {
+      if (!msg || !expected.has(msg.address)) return;
+      const raw = Number(msg.args?.[0]);
+      if (!Number.isFinite(raw)) return;
+      cleanup();
+      const zeroToOne = toZeroOne(raw);
+      lastParam.sat = zeroToOne;
+      callback(zeroToOne);
+    };
+
+    const cleanup = () => {
+      try { udpPort.removeListener('message', onMsg); } catch {}
+      clearTimeout(timer);
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      if (lastParam.sat !== null) callback(lastParam.sat);
+    }, 300);
+
+    udpPort.on('message', onMsg);
+  },
+
+  setCCTValue: function (value) {
+    const percent = toPercent(value);
+    udpPort.send({
+      address: `/eos/param/ctc`,
+      args: [{ type: 'f', value: percent }]
+    }, CONSOLE_HOST, CONSOLE_PORT);
+  },
+
+  getCCTValue: function (callback) {
+    if (typeof callback !== 'function') callback = () => {};
+    udpPort.send({ address: `/eos/get/param/ctc`, args: [] }, CONSOLE_HOST, CONSOLE_PORT);
+
+    const expected = new Set([
+      `/eos/out/param/ctc`,
+      `/eos/out/param/ctc/percent`,
+      `/eos/out/user/${USER_MAP}/selected/param/ctc`
+    ]);
+
+    const onMsg = (msg) => {
+      if (!msg || !expected.has(msg.address)) return;
+      const raw = Number(msg.args?.[0]);
+      if (!Number.isFinite(raw)) return;
+      cleanup();
+      const zeroToOne = toZeroOne(raw);
+      lastParam.cct = zeroToOne;
+      callback(zeroToOne);
+    };
+
+    const cleanup = () => {
+      try { udpPort.removeListener('message', onMsg); } catch {}
+      clearTimeout(timer);
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      if (lastParam.cct !== null) callback(lastParam.cct);
+    }, 300);
+
+    udpPort.on('message', onMsg);
+  },
+
   onFaderLevel,
 };
