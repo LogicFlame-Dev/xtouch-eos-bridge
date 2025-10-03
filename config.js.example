@@ -1,0 +1,21 @@
+module.exports = {
+    midi: {
+        inputName: '', //E.G: X-TOUCH COMPACT
+        outputName: '', //E.G: X-TOUCH COMPACT
+        defaultChannel: 1,
+        pageLEDCCEncoder: 22 //Ring LED for the page (XTOUCH Compact Laybled as 13)
+    },
+    eos: {
+        ip: '127.0.0.1',
+        port: 8082,
+        userMap: "1"
+    },
+    timing: {
+        pageSyncDelayMs: 200
+    },
+    logging: {
+        enabled: true,
+        color: true
+    },
+    debuger: false
+};

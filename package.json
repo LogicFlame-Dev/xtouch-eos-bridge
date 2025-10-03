@@ -1,0 +1,17 @@
+{
+  "name": "xtouch-eos-ctrl",
+  "version": "1.0.9",
+  "description": "Xtouch control using MIDI and OSC to control elements and aspects of ETC EOS (Nommad)",
+  "main": "xtouch.js",
+  "scripts": {
+    "start": "node ."
+  },
+  "author": "LogicFlameDevelopment & CC Illuminations",
+  "license": "ISC",
+  "dependencies": {
+    "easymidi": "^3.1.0",
+    "midi": "^2.0.0",
+    "node-gyp": "^10.1.0",
+    "osc": "^2.4.4"
+  }
+}
